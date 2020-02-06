@@ -66,18 +66,32 @@ def model(images, cfg, is_training):
     
     return outputs
 
-
+# idk where is this one being used
 def decoder_part(input, cfg):
+    """Not sure what's this function for... """
     batch_size = input.size()[0]
-    fake_input = tf.zeros([batch_size, 128*4*4])
-    act_func = tf.nn.leaky_relu
-
+    act_func = torch.nn.LeakyReLU(negative_slope=0.2)
     fc_dim = cfg.fc_dim
     z_dim = cfg.z_dim
 
-    # this is unused but needed to match the FC layers in the encoder function
-    fc1 = slim.fully_connected(fake_input, fc_dim, activation_fn=act_func)
+    fc2 = torch.nn.Linear(input.size()[1], fc_dim)
+    fc3 = torch.nn.Linear(fc_dim, z_dim)
 
-    fc2 = slim.fully_connected(input, fc_dim, activation_fn=act_func)
-    fc3 = slim.fully_connected(fc2, z_dim, activation_fn=act_func)
-    return fc3
+    out = act_func(fc2(input))
+    out = act_func(fc3(out))
+    return out
+
+# def decoder_part(input, cfg):
+#     batch_size = input.shape.as_list()[0]
+#     fake_input = tf.zeros([batch_size, 128*4*4])
+#     act_func = tf.nn.leaky_relu
+
+#     fc_dim = cfg.fc_dim
+#     z_dim = cfg.z_dim
+
+#     # this is unused but needed to match the FC layers in the encoder function
+#     fc1 = slim.fully_connected(fake_input, fc_dim, activation_fn=act_func)
+
+#     fc2 = slim.fully_connected(input, fc_dim, activation_fn=act_func)
+#     fc3 = slim.fully_connected(fc2, z_dim, activation_fn=act_func)
+#     return fc3
