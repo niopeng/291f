@@ -1,6 +1,4 @@
 # pytorching working on
-import tensorflow as tf
-import tensorflow.contrib.slim as slim
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -12,9 +10,9 @@ def model(inputs, outputs_all, cfg, is_training):
     batch_size = inputs.size()[0]
     fc1 = torch.nn.Linear(inputs.size()[1], num_points*3)
     # nn.init.normal_ instead of tf.truncated_normal_initializer()
-    torch.nn.init.normal_(fc.weight, std=init_stddev)
+    torch.nn.init.normal_(fc1.weight, std=init_stddev)
 
-    pts_raw = fc(inputs)
+    pts_raw = fc1(inputs)
     pred_pts = pts_raw.view(batch_size, num_points, 3)
     pred_pts = F.tanh(pred_pts)
 
@@ -42,9 +40,9 @@ def model(inputs, outputs_all, cfg, is_training):
     if cfg.pc_rgb:
         if cfg.pc_rgb_deep_decoder:
             inp = outputs_all["conv_features"]
-            inp = F.leaky_relu(deep_fc1(inp), 0.2)
-            inp = F.leaky_relu(deep_fc2(inp), 0.2)
-            inp = F.leaky_relu(deep_fc3(inp), 0.2)
+            inp = F.leaky_relu(deep_fc1(inp), negative_slope=0.2)
+            inp = F.leaky_relu(deep_fc2(inp), negative_slope=0.2)
+            inp = F.leaky_relu(deep_fc3(inp), negative_slope=0.2)
             rgb_raw = deep_fc_last(inp)
 
         else:
