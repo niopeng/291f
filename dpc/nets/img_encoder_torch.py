@@ -1,4 +1,4 @@
-## pytorching working on
+## pytorching done
 
 import numpy as np
 import tensorflow as tf
@@ -37,7 +37,7 @@ def model(images, cfg, is_training):
     # define convolution layers
     conv_list = []
     conv_list.append(torch.nn.Conv2d(image.size()[1], f_dim, (5,5), stride=(2,2)))
-    for k in range(num_blocks):
+    for k in range(3): # for k in range(num_blocks):
         new_f_dim = f_dim * 2
         conv_list.append(torch.nn.Conv2d(f_dim, new_f_dim, (3,3), stride=(2,2)))
         conv_list.append(torch.nn.Conv2d(new_f_dim, new_f_dim, (3,3), stride=(1,1)))
