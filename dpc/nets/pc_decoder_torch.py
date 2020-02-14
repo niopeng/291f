@@ -21,9 +21,9 @@ class pcDecoder(torch.nn.Module):
         self.deep_fc_last = torch.nn.Linear(self.fc_dim, self.num_points*3)
         self.shallow_fc_last = torch.nn.Linear(self.input_size, self.num_points*3)
 
-        torch.nn.init.normal_(self.fc1.weight, std=cfg.init_stddev)
-        torch.nn.init.normal_(self.deep_fc_last.weight, std=cfg.init_stddev)
-        torch.nn.init.normal_(self.shallow_fc_last.weight, std=cfg.init_stddev)
+        torch.nn.init.normal_(self.fc1.weight, std=cfg.pc_decoder_init_stddev)
+        torch.nn.init.normal_(self.deep_fc_last.weight, std=cfg.pc_decoder_init_stddev)
+        torch.nn.init.normal_(self.shallow_fc_last.weight, std=cfg.pc_decoder_init_stddev)
         torch.nn.init.kaiming_normal_(self.deep_fc1.weight, a=0.2)
         torch.nn.init.kaiming_normal_(self.deep_fc2.weight, a=0.2)
         torch.nn.init.kaiming_normal_(self.deep_fc3.weight, a=0.2)
