@@ -19,7 +19,7 @@ pos = poseDecoder(cfg)
 for batch_idx, (data, target) in enumerate(load_dataset()):
     print (data.size())
     out0 = enc(data, False)
-    out1 = dec(out0["ids"], outputs, False)
+    out1 = dec(out0["ids"], out0, False)
     out2 = pos(out0['poses'])
     break
 
