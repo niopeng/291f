@@ -22,4 +22,13 @@ for batch_idx, (data, target) in enumerate(load_dataset()):
     out1 = dec(outputs["ids"], outputs, False)
     out2 = pos(outputs['poses'])
     break
+
+print ([(key, out0[key].size()) for key in out0.keys()])
+# [('conv_features', torch.Size([2, 4096])), ('z_latent', torch.Size([2, 1024])), ('poses', torch.Size([2, 500])), ('ids', torch.Size([2, 500]))]
+
+print ([(key, out1[key].size()) for key in out1.keys()])
+# [('xyz', torch.Size([2, 8000, 3])), ('rgb', torch.Size([2, 8000, 3]))]
+
+print ([(key, out2[key].size()) for key in out2.keys()])
+# [('poses', torch.Size([2, 4, 4])), ('pose_student', torch.Size([2, 4])), ('predicted_translation', torch.Size([2, 3]))]
 ```
