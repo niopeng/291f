@@ -6,7 +6,7 @@ python ../../dpc/run/train_eval_torch.py
 ```
 
 ### How to use the pytorch version Net
-```
+`
 import torch
 from nets.img_encoder_torch import imgEncoder
 from nets.pc_decoder_torch import pcDecoder
@@ -22,4 +22,4 @@ for batch_idx, (data, target) in enumerate(load_dataset()):
     out1 = dec(outputs["ids"], outputs, False)
     out2 = pos(outputs['poses'])
     break
-```
+`
