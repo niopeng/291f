@@ -9,9 +9,57 @@ def gauss_kernel_1d(l, sig):
     """
     creates gaussian kernel with side length l and a sigma of sig
     """
-    xx = torch.range(-l // 2 + 1., l // 2 + 1., dtype=torch.float32)
+    xx = torch.arange(-l // 2 + 1., l // 2 + 1., dtype=torch.float32)
     kernel = torch.exp(-xx**2 / (2. * sig**2))
     return kernel / torch.sum(kernel)
+
+def separable_kernels(kernel):
+    """pytorch version"""
+    size = kernel.size()[0]
+    k1 = kernel.view((1,1,size,1,1))
+    k2 = kernel.view((1,1,1,size,1))
+    k3 = kernel.view((1,1,1,1,size))
+    return [k1, k2, k3]
+
+def smoothing_kernel(cfg, sigma):
+    """
+    pytorch version, output is [k1,k2,k3].\n
+    each kernel is view as [out_c(1), in_c(1), depth, height, width]
+    """
+    fsz = cfg.pc_gauss_kernel_size
+    kernel_1d = gauss_kernel_1d(fsz, sigma)
+    kernel = separable_kernels(kernel_1d)
+    return kernel
+
+
+# def separable_kernels(kernel):
+#     size = kernel.shape[0]
+#     k1 = tf.reshape(kernel, [1, 1, size, 1, 1])
+#     k2 = tf.reshape(kernel, [1, size, 1, 1, 1])
+#     k3 = tf.reshape(kernel, [size, 1, 1, 1, 1])
+#     return [k1, k2, k3]
+
+
+# def smoothing_kernel(cfg, sigma):
+#     fsz = cfg.pc_gauss_kernel_size
+#     kernel_1d = gauss_kernel_1d(fsz, sigma)
+#     if cfg.vox_size_z != -1:  # default vox_size_z is -1
+#         vox_size_z = cfg.vox_size_z
+#         vox_size = cfg.vox_size
+#         ratio = vox_size_z / vox_size
+#         sigma_z = sigma * ratio
+#         fsz_z = int(np.floor(fsz * ratio))
+#         if fsz_z % 2 == 0:
+#             fsz_z += 1
+#         kernel_1d_z = gauss_kernel_1d(fsz_z, sigma_z)
+#         k1 = tf.reshape(kernel_1d, [1, 1, fsz, 1, 1])
+#         k2 = tf.reshape(kernel_1d, [1, fsz, 1, 1, 1])
+#         k3 = tf.reshape(kernel_1d_z, [fsz_z, 1, 1, 1, 1])
+#         kernel = [k1, k2, k3]
+#     else:
+#         if cfg.pc_separable_gauss_filter: # default is True
+#             kernel = separable_kernels(kernel_1d)
+#     return kernel
 
 
 class GaussianSmoothing(nn.Module):
@@ -95,18 +143,12 @@ def gauss_smoothen_image(cfg, img, sigma_rel):
     return img_tmp
 
 
-def separable_kernels(kernel):
-    size = kernel.shape[0]
-    k1 = tf.reshape(kernel, [1, 1, size, 1, 1])
-    k2 = tf.reshape(kernel, [1, size, 1, 1, 1])
-    k3 = tf.reshape(kernel, [size, 1, 1, 1, 1])
-    return [k1, k2, k3]
 
 
 def smoothing_kernel(cfg, sigma):
     fsz = cfg.pc_gauss_kernel_size
     kernel_1d = gauss_kernel_1d(fsz, sigma)
-    if cfg.vox_size_z != -1:
+    if cfg.vox_size_z != -1:  # default vox_size_z is -1
         vox_size_z = cfg.vox_size_z
         vox_size = cfg.vox_size
         ratio = vox_size_z / vox_size
@@ -120,6 +162,6 @@ def smoothing_kernel(cfg, sigma):
         k3 = tf.reshape(kernel_1d_z, [fsz_z, 1, 1, 1, 1])
         kernel = [k1, k2, k3]
     else:
-        if cfg.pc_separable_gauss_filter:
+        if cfg.pc_separable_gauss_filter: # default is True
             kernel = separable_kernels(kernel_1d)
     return kernel
