@@ -210,7 +210,7 @@ class ModelPointCloud(ModelBase):  # pylint:disable=invalid-name
                 pose_out = posenet_fn(enc_outputs['poses'], cfg)
                 outputs.update(pose_out)
         
-        with tf.variable_scope('trash', reuse=resue):
+        with tf.variable_scope('trash', reuse=reuse):
             outputs['scaling_factor'] = predict_scaling_factor(cfg, outputs[key], is_training)
             outputs['focal_length'] = predict_focal_length(cfg, outputs['ids'], is_training)
 
