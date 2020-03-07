@@ -145,23 +145,4 @@ def gauss_smoothen_image(cfg, img, sigma_rel):
 
 
 
-def smoothing_kernel(cfg, sigma):
-    fsz = cfg.pc_gauss_kernel_size
-    kernel_1d = gauss_kernel_1d(fsz, sigma)
-    if cfg.vox_size_z != -1:  # default vox_size_z is -1
-        vox_size_z = cfg.vox_size_z
-        vox_size = cfg.vox_size
-        ratio = vox_size_z / vox_size
-        sigma_z = sigma * ratio
-        fsz_z = int(np.floor(fsz * ratio))
-        if fsz_z % 2 == 0:
-            fsz_z += 1
-        kernel_1d_z = gauss_kernel_1d(fsz_z, sigma_z)
-        k1 = tf.reshape(kernel_1d, [1, 1, fsz, 1, 1])
-        k2 = tf.reshape(kernel_1d, [1, fsz, 1, 1, 1])
-        k3 = tf.reshape(kernel_1d_z, [fsz_z, 1, 1, 1, 1])
-        kernel = [k1, k2, k3]
-    else:
-        if cfg.pc_separable_gauss_filter: # default is True
-            kernel = separable_kernels(kernel_1d)
-    return kernel
+# 
