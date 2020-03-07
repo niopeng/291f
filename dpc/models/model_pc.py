@@ -179,10 +179,12 @@ class ModelPointCloud(ModelBase):  # pylint:disable=invalid-name
 
         # First, build the encoder
         encoder_fn = get_network(cfg.encoder_name)
+        # second_encoder_fn = get_network("extra_layer")
         with tf.variable_scope('encoder', reuse=reuse):
             # Produces id/pose units
             enc_outputs = encoder_fn(images, cfg, is_training)
             ids = enc_outputs['ids']
+            # ids = second_encoder_fn(enc_outputs['ids'], cfg)
             outputs['conv_features'] = enc_outputs['conv_features']
             outputs['ids'] = ids
             outputs['z_latent'] = enc_outputs['z_latent']
@@ -200,13 +202,17 @@ class ModelPointCloud(ModelBase):  # pylint:disable=invalid-name
             pc = decoder_out['xyz']
             outputs['points_1'] = pc
             outputs['rgb_1'] = decoder_out['rgb']
-            outputs['scaling_factor'] = predict_scaling_factor(cfg, outputs[key], is_training)
-            outputs['focal_length'] = predict_focal_length(cfg, outputs['ids'], is_training)
+            # outputs['scaling_factor'] = predict_scaling_factor(cfg, outputs[key], is_training)
+            # outputs['focal_length'] = predict_focal_length(cfg, outputs['ids'], is_training)
 
             if cfg.predict_pose:
                 posenet_fn = get_network(cfg.posenet_name)
                 pose_out = posenet_fn(enc_outputs['poses'], cfg)
                 outputs.update(pose_out)
+        
+        with tf.variable_scope('trash', reuse=resue):
+            outputs['scaling_factor'] = predict_scaling_factor(cfg, outputs[key], is_training)
+            outputs['focal_length'] = predict_focal_length(cfg, outputs['ids'], is_training)
 
         if self._alignment_to_canonical is not None:
             outputs = align_predictions(outputs, self._alignment_to_canonical)
@@ -395,7 +401,7 @@ class ModelPointCloud(ModelBase):  # pylint:disable=invalid-name
             else:
                 interp_method = tf.image.ResizeMethod.BILINEAR
             gt = tf.image.resize_images(gt, [pred_size, pred_size], interp_method)
-        if cfg.pc_gauss_filter_gt:
+        if cfg.pc_gauss_filter_gt: # default pc_gauss_filter_gt is False
             sigma_rel = self._sigma_rel
             smoothed = gauss_smoothen_image(cfg, gt, sigma_rel)
             if cfg.pc_gauss_filter_gt_switch_off:
