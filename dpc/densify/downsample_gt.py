@@ -50,9 +50,10 @@ def downsample_point_clouds():
 
         Vgt = obj["points"]
 
-        pcd = open3d.PointCloud()
-        pcd.points = open3d.Vector3dVector(Vgt)
-        downpcd = open3d.voxel_down_sample(pcd, voxel_size=vox_size)
+        pcd = open3d.geometry.PointCloud()
+        pcd.points = open3d.utility.Vector3dVector(Vgt)
+        # downpcd = open3d.geometry.voxel_down_sample(pcd, voxel_size=vox_size)
+        downpcd = pcd.voxel_down_sample(voxel_size=vox_size)
         down_xyz = np.asarray(downpcd.points)
         scipy.io.savemat(out_filename, {"points": down_xyz})
 

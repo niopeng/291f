@@ -26,6 +26,34 @@ def compute_distance(cfg, sess, min_dist, idx, source, target, source_np, target
     for k in range(num_parts):
         r = partition[k, :]
         src = source_np[r[0]:r[1]]
+
+        # add resize
+        # print(target_np.shape, src.shape)
+        # tf.print(tf.reduce_min(target_np, axis=0))
+        # with tf.Session() as sess:  tnp = target_np.eval()
+        # print(np.max(target_np, axis=0),
+        #       np.min(target_np, axis=0))
+        # print(type(src))
+        # target_np = tf.add(tf.multiply(tf.div(
+        #    tf.subtract(target_np,  tf.reduce_min(target_np, axis=0)),
+        #    tf.subtract(
+        #       tf.reduce_max(target_np, axis=0),
+        #       tf.reduce_min(target_np, axis=0)
+        #    )
+        # ),
+        #     tf.subtract(
+        #         tf.reduce_max(src, axis=0),
+        #         tf.reduce_min(src, axis=0)
+        #     )
+        # ),
+        #     tf.reduce_min(src, axis=0)
+        # )
+        # with tf.Session() as sess:  tnp = target_np.eval()
+        # print(np.max(target_np, axis=0),
+        #       np.min(target_np, axis=0))
+        #
+        # print(a)
+
         (min_dist_0_np, idx_0_np) = sess.run([min_dist, idx],
                                              feed_dict={source: src,
                                                        target: target_np})
@@ -84,7 +112,8 @@ def run_eval():
             continue
 
         model_names.append(sample.name)
-        mat_filename = "{}/{}_pc.mat".format(save_dir, sample.name)
+        # mat_filename = "{}/{}_pc.mat".format(save_dir, sample.name)
+        mat_filename = "{}/{}_pc".format(save_dir, sample.name)
         if os.path.isfile(mat_filename):
             data = scipy.io.loadmat(mat_filename)
             all_pcs = np.squeeze(data["points"])
@@ -95,6 +124,7 @@ def run_eval():
                 has_number = False
         else:
             data = np.load("{}/{}_pc.npz".format(save_dir, sample.name))
+            # data = np.load("{}/{}_pc".format(save_dir, sample.name), allow_pickle=True)
             all_pcs = np.squeeze(data["arr_0"])
             if 'arr_1' in list(data.keys()):
                 all_pcs_nums = np.squeeze(data["arr_1"])
@@ -116,6 +146,58 @@ def run_eval():
                 pred = sess.run(rotated_pc, feed_dict={source_pc_2: pred,
                                                        quat_tf: reference_rotation})
                 pred = np.squeeze(pred)
+
+            # print(pred.shape, target_pc.shape)
+
+            # Vgt = tf.add(tf.multiply(tf.div(
+            #     tf.subtract(Vgt, tf.reduce_min(Vgt, axis=0)),
+            #     tf.subtract(
+            #         tf.reduce_max(Vgt, axis=0),
+            #         tf.reduce_min(Vgt, axis=0)
+            #     )
+            # ),
+            #     tf.subtract(
+            #         tf.reduce_max(pred, axis=0),
+            #         tf.reduce_min(pred, axis=0)
+            #     )
+            # ),
+            #     tf.reduce_min(pred, axis=0)
+            # )
+
+            np.save("/home/nio/differentiable-point-clouds/experiments/pc/%s_%d_pred.npy" % (sample.name, i), pred)
+            np.save("/home/nio/differentiable-point-clouds/experiments/pc/%s_%d_vgt_0.npy" % (sample.name, i), Vgt)
+
+
+            tran = [
+                [-1., 0., 0.],
+                [0., 1., 0.],
+                [0., 0., -1.]
+            ]
+            # new_point = pc_transform(points_np_gt['points'].reshape(1, -1, 3), tran)
+            # Vgt = np.dot(Vgt, tran)
+
+            np.save("/home/nio/differentiable-point-clouds/experiments/pc/%s_%d_vgt_1.npy" % (sample.name, i), Vgt)
+
+
+            Vgt = (Vgt - np.min(Vgt, axis=0)) / (np.max(Vgt, axis=0) - np.min(Vgt, axis=0)) * (np.max(pred, axis=0) - np.min(pred, axis=0)) + np.min(pred, axis=0)
+
+            np.save("/home/nio/differentiable-point-clouds/experiments/pc/%s_%d_vgt_2.npy" % (sample.name, i), Vgt)
+
+            #     tf.add(tf.multiply(tf.div(
+            #     tf.subtract(Vgt, tf.reduce_min(Vgt, axis=0)),
+            #     tf.subtract(
+            #         tf.reduce_max(Vgt, axis=0),
+            #         tf.reduce_min(Vgt, axis=0)
+            #     )
+            # ),
+            #     tf.subtract(
+            #         tf.reduce_max(pred, axis=0),
+            #         tf.reduce_min(pred, axis=0)
+            #     )
+            # ),
+            #     tf.reduce_min(pred, axis=0)
+            # )
+            # print(a)
 
             pred_to_gt, idx_np = compute_distance(cfg, sess, min_dist, min_idx, source_pc, target_pc, pred, Vgt)
             gt_to_pred, _ = compute_distance(cfg, sess, min_dist, min_idx, source_pc, target_pc, Vgt, pred)

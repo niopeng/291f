@@ -18,6 +18,9 @@ def compute_eval():
 
     compute_predictions_pc()
 
+    print(cfg.predict_pose, cfg.eval_split)
+    print("!" * 10)
+
     if cfg.predict_pose and cfg.eval_split == "val":
         import subprocess
         import sys
@@ -25,6 +28,8 @@ def compute_eval():
         # and it cannot be mixed with the graph mode within the same process
         script_dir = os.path.dirname(os.path.realpath(__file__))
         args = " ".join(sys.argv[1:])
+        print(args)
+        print("*" *10)
         cmd = f"python {script_dir}/compute_alignment.py {args}"
         subprocess.call(cmd, shell=True)
 
