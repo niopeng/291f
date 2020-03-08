@@ -24,6 +24,7 @@ def generate_commands():
     args = parse_arguments()
     synth_set = args.synth_set
     output_dir = os.path.join(os.getcwd(), args.output_dir)
+    print(output_dir, args.shapenet_path)
     script_path = os.path.join(script_dir, "densify_single.py")
 
     prefix = "{} {} {} {} {} ".format(args.python_interpreter, script_path, args.shapenet_path, output_dir, synth_set)

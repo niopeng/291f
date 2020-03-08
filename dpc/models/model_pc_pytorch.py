@@ -3,14 +3,15 @@ import scipy.io
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from collections import OrderedDict
 
-from models.model_base import ModelBase, pool_single_view
+from models.model_base_pytorch import ModelBase, pool_single_view
 
-from util.losses import add_drc_loss, add_proj_rgb_loss, add_proj_depth_loss
-from util.point_cloud import pointcloud_project, pointcloud_project_fast, \
+# from util.losses import add_drc_loss, add_proj_rgb_loss, add_proj_depth_loss
+from util.point_cloud_pytorch import pointcloud_project, pointcloud_project_fast, \
     pc_point_dropout
 from util.gauss_kernel_pytorch import gauss_smoothen_image, smoothing_kernel
-from util.quaternion_pytorch import \
+from util.quaternion_torch import \
     quaternion_multiply as q_mul,\
     quaternion_normalise as q_norm,\
     quaternion_rotate as q_rotate,\
@@ -95,50 +96,88 @@ def align_predictions(outputs, alignment):
     return outputs
 
 
-def predict_scaling_factor(cfg, input, is_training):
-    if not cfg.pc_learn_occupancy_scaling:
-        return None
+class Scale_net(nn.Module):
+    '''For creating several pose regressors,
+       input shape should be [batch_size, z_dim]'''
 
-    weight_dict = OrderedDict()
-    weight_dict.update({'0.weight': weights})
-    weight_dict.update({'0.bias': biases})
+    def __init__(self, cfg):
+        super(Scale_net, self).__init__()
 
-    pred = nn.Sequential(nn.Linear(input, 1))
+        self.cfg = cfg
+        self.layer = nn.Linear(self.z_dim, 1)
 
-    init_stddev = 0.025
-    w_init = tf.truncated_normal_initializer(stddev=init_stddev, seed=1)
+    def forward(self, inputs):
+        out = F.sigmoid(self.layer(inputs)) * self.cfg.pc_occupancy_scaling_maximum
+        return out
 
-    with slim.arg_scope(
-            [slim.fully_connected],
-            weights_initializer=w_init,
-            activation_fn=None):
-        pred = slim.fully_connected(input, 1)
-        pred = tf.sigmoid(pred) * cfg.pc_occupancy_scaling_maximum
 
-    if is_training:
-        tf.contrib.summary.scalar("pc_occupancy_scaling_factor", tf.reduce_mean(pred))
+# def predict_scaling_factor(cfg, input):
+#     if not cfg.pc_learn_occupancy_scaling:
+#         return None
+#
+#     weight_dict = OrderedDict()
+#     weight_dict.update({'0.weight': weights})
+#     weight_dict.update({'0.bias': biases})
+#
+#     pred = nn.Sequential(nn.Linear(input, 1))
+#
+#     init_stddev = 0.025
+#     w_init = tf.truncated_normal_initializer(stddev=init_stddev, seed=1)
+#
+#     with slim.arg_scope(
+#             [slim.fully_connected],
+#             weights_initializer=w_init,
+#             activation_fn=None):
+#         pred = slim.fully_connected(input, 1)
+#         pred = tf.sigmoid(pred) * cfg.pc_occupancy_scaling_maximum
+#
+#     return pred
 
-    return pred
+# def predict_scaling_factor(cfg, input, is_training):
+#     if not cfg.pc_learn_occupancy_scaling:
+#         return None
+#
+#     weight_dict = OrderedDict()
+#     weight_dict.update({'0.weight': weights})
+#     weight_dict.update({'0.bias': biases})
+#
+#     pred = nn.Sequential(nn.Linear(input, 1))
+#
+#     init_stddev = 0.025
+#     w_init = tf.truncated_normal_initializer(stddev=init_stddev, seed=1)
+#
+#     with slim.arg_scope(
+#             [slim.fully_connected],
+#             weights_initializer=w_init,
+#             activation_fn=None):
+#         pred = slim.fully_connected(input, 1)
+#         pred = tf.sigmoid(pred) * cfg.pc_occupancy_scaling_maximum
+#
+#     if is_training:
+#         tf.contrib.summary.scalar("pc_occupancy_scaling_factor", tf.reduce_mean(pred))
+#
+#     return pred
 
 
 def predict_focal_length(cfg, input, is_training):
-    if not cfg.learn_focal_length:
-        return None
-
-    init_stddev = 0.025
-    w_init = tf.truncated_normal_initializer(stddev=init_stddev, seed=1)
-
-    with slim.arg_scope(
-            [slim.fully_connected],
-            weights_initializer=w_init,
-            activation_fn=None):
-        pred = slim.fully_connected(input, 1)
-        out = cfg.focal_length_mean + tf.sigmoid(pred) * cfg.focal_length_range
-
-    if is_training:
-        tf.contrib.summary.scalar("meta/focal_length", tf.reduce_mean(out))
-
-    return out
+    return None
+    # if not cfg.learn_focal_length:
+    #     return None
+    #
+    # init_stddev = 0.025
+    # w_init = tf.truncated_normal_initializer(stddev=init_stddev, seed=1)
+    #
+    # with slim.arg_scope(
+    #         [slim.fully_connected],
+    #         weights_initializer=w_init,
+    #         activation_fn=None):
+    #     pred = slim.fully_connected(input, 1)
+    #     out = cfg.focal_length_mean + tf.sigmoid(pred) * cfg.focal_length_range
+    #
+    # if is_training:
+    #     tf.contrib.summary.scalar("meta/focal_length", tf.reduce_mean(out))
+    #
+    # return out
 
 
 class ModelPointCloud(ModelBase):  # pylint:disable=invalid-name
@@ -157,14 +196,16 @@ class ModelPointCloud(ModelBase):  # pylint:disable=invalid-name
             self.set_alignment_to_canonical()
 
         # added code piece
-        self.device = torch.device('cuda' if cfg.gpu is not None else 'cpu')
         self.encoder = get_network(cfg.encoder_name).to(self.device)
         self.decoder = get_network(cfg.decoder_name).to(self.device)
         self.posenet = get_network(cfg.posenet_name).to(self.device)
+        self.scalenet = Scale_net(cfg).to(self.device)
 
         if is_train:
             self.encoder.train()
             self.decoder.train()
+            self.posenet.train()
+            self.scalenet.train()
 
             optim_params = []
             for k, v in self.encoder.named_parameters():  # can optimize for a part of the model
@@ -177,6 +218,18 @@ class ModelPointCloud(ModelBase):  # pylint:disable=invalid-name
                     optim_params.append(v)
                 else:
                     print('WARNING: params [{:s}] will not optimize.'.format(k))
+            for k, v in self.posenet.named_parameters():  # can optimize for a part of the model
+                if v.requires_grad:
+                    optim_params.append(v)
+                else:
+                    print('WARNING: params [{:s}] will not optimize.'.format(k))
+
+            for k, v in self.scalenet.named_parameters():  # can optimize for a part of the model
+                if v.requires_grad:
+                    optim_params.append(v)
+                else:
+                    print('WARNING: params [{:s}] will not optimize.'.format(k))
+
             self.params = optim_params
             self.optimizer = torch.optim.Adam(optim_params, lr=cfg.learning_rate,
                                                 weight_decay=cfg.weight_decay, betas=(0.9, 0.999))
@@ -202,13 +255,14 @@ class ModelPointCloud(ModelBase):  # pylint:disable=invalid-name
             sigma = 1.0
             values = np.random.normal(loc=0.0, scale=sigma, size=(num_points, 3))
             values = np.clip(values, -3*sigma, +3*sigma)
-            self._pc_for_alignloss = tf.Variable(values, name="point_cloud_for_align_loss",
-                                                 dtype=tf.float32)
+            self._pc_for_alignloss = torch.tensor(values, dtype=torch.float32, requires_grad=True)
+            # self._pc_for_alignloss = tf.Variable(values, name="point_cloud_for_align_loss",
+            #                                      dtype=tf.float32)
 
     def set_alignment_to_canonical(self):
         exp_dir = self.cfg().checkpoint_dir
         stuff = scipy.io.loadmat(f"{exp_dir}/final_reference_rotation.mat")
-        alignment = tf.constant(stuff["rotation"], tf.float32)
+        alignment = torch.tensor(stuff["rotation"], torch.float32)
         self._alignment_to_canonical = alignment
 
 
@@ -218,6 +272,7 @@ class ModelPointCloud(ModelBase):  # pylint:disable=invalid-name
         self.encoder.eval()
         self.decoder.eval()
         self.posenet.eval()
+        self.scalenet.eval()
         with torch.no_grad():
             enc_outputs = self.encoder(images.permute(0, 2, 3, 1))
             ids = enc_outputs['ids']
@@ -235,8 +290,8 @@ class ModelPointCloud(ModelBase):  # pylint:disable=invalid-name
             pc = decoder_out['xyz']
             outputs['points_1'] = pc
             outputs['rgb_1'] = decoder_out['rgb']
-            outputs['scaling_factor'] = predict_scaling_factor(cfg, outputs[key], is_training)
-            outputs['focal_length'] = predict_focal_length(cfg, outputs['ids'], is_training)
+            outputs['scaling_factor'] = self.scalenet(outputs[key])
+            outputs['focal_length'] = predict_focal_length(cfg, outputs['ids'])
 
             if cfg.predict_pose:
                 pose_out = self.posenet(enc_outputs['poses'])
@@ -244,7 +299,8 @@ class ModelPointCloud(ModelBase):  # pylint:disable=invalid-name
 
         self.encoder.train()
         self.decoder.train()
-        # self.posenet.train()
+        self.scalenet.train()
+        self.posenet.train()
 
         if self._alignment_to_canonical is not None:
             outputs = align_predictions(outputs, self._alignment_to_canonical)
@@ -273,8 +329,8 @@ class ModelPointCloud(ModelBase):  # pylint:disable=invalid-name
         pc = decoder_out['xyz']
         outputs['points_1'] = pc
         outputs['rgb_1'] = decoder_out['rgb']
-        outputs['scaling_factor'] = predict_scaling_factor(cfg, outputs[key], is_training)
-        outputs['focal_length'] = predict_focal_length(cfg, outputs['ids'], is_training)
+        outputs['scaling_factor'] = self.scalenet(outputs[key])
+        outputs['focal_length'] = predict_focal_length(cfg, outputs['ids'])
 
         if cfg.predict_pose:
             pose_out = self.posenet(enc_outputs['poses'])
@@ -374,8 +430,8 @@ class ModelPointCloud(ModelBase):  # pylint:disable=invalid-name
 
         if is_training and cfg.pc_point_dropout != 1:
             dropout_prob = self.get_dropout_keep_prob()
-            if is_training:
-                tf.contrib.summary.scalar("meta/pc_point_dropout_prob", dropout_prob)
+            # if is_training:
+            #     tf.contrib.summary.scalar("meta/pc_point_dropout_prob", dropout_prob)
             all_points, all_rgb = pc_point_dropout(all_points, all_rgb, dropout_prob)
 
         if cfg.pc_fast:
@@ -491,13 +547,14 @@ class ModelPointCloud(ModelBase):  # pylint:disable=invalid-name
         teachers = outputs["poses"]
         teachers = torch.reshape(teachers, [-1, num_candidates, 4])
 
-        indices = min_loss
-        indices = torch.unsqueeze(indices, dim=-1)
-        batch_size = teachers.size(0)
-        batch_indices = torch.range(0, batch_size, 1, dtype=torch.int64)
-        batch_indices = torch.unsqueeze(batch_indices, -1)
-        indices = torch.concat([batch_indices, indices], dim=1)
-        teachers = tf.gather_nd(teachers, indices)
+        # indices = min_loss
+        # indices = torch.unsqueeze(indices, dim=-1)
+        # batch_size = teachers.size(0)
+        # batch_indices = torch.range(0, batch_size, 1, dtype=torch.int64)
+        # batch_indices = torch.unsqueeze(batch_indices, -1)
+        # indices = torch.concat([batch_indices, indices], dim=1)
+        # teachers = tf.gather_nd(teachers, indices)
+        teachers = teachers[torch.arange(teachers.size(0)), min_loss]
         # use teachers only as ground truth
         # teachers = tf.stop_gradient(teachers)
         teachers.requires_grad_(False)
@@ -546,13 +603,13 @@ class ModelPointCloud(ModelBase):  # pylint:disable=invalid-name
                 interp_method = "bilinear"
             gt = F.interpolate(gt, size=[pred_size, pred_size], mode=interp_method)
 
-        if cfg.pc_gauss_filter_gt:
-            sigma_rel = self._sigma_rel
-            smoothed = gauss_smoothen_image(cfg, gt, sigma_rel)
-            if cfg.pc_gauss_filter_gt_switch_off:
-                gt = torch.where(sigma_rel < 1.0, gt, smoothed)
-            else:
-                gt = smoothed
+        # if cfg.pc_gauss_filter_gt:
+        #     sigma_rel = self._sigma_rel
+        #     smoothed = gauss_smoothen_image(cfg, gt, sigma_rel)
+        #     if cfg.pc_gauss_filter_gt_switch_off:
+        #         gt = torch.where(sigma_rel < 1.0, gt, smoothed)
+        #     else:
+        #         gt = smoothed
 
         total_loss = 0
         num_candidates = cfg.pose_predict_num_candidates

@@ -18,28 +18,28 @@ from util.quaternion import as_rotation_matrix, from_rotation_matrix, quaternion
 
 
 def draw_registration_result(src, trgt):
-    source = open3d.PointCloud()
-    source.points = open3d.Vector3dVector(src)
-    target = open3d.PointCloud()
-    target.points = open3d.Vector3dVector(trgt)
+    source = open3d.geometry.PointCloud()
+    source.points = open3d.utility.Vector3dVector(src)
+    target = open3d.geometry.PointCloud()
+    target.points = open3d.utility.Vector3dVector(trgt)
     source.paint_uniform_color([1, 0.706, 0])
     target.paint_uniform_color([0, 0.651, 0.929])
-    open3d.draw_geometries([source, target])
+    open3d.visualization.draw_geometries([source, target])
 
 
 def open3d_icp(src, trgt, init_rotation=np.eye(3, 3)):
-    source = open3d.PointCloud()
-    source.points = open3d.Vector3dVector(src)
+    source = open3d.geometry.PointCloud()
+    source.points = open3d.utility.Vector3dVector(src)
 
-    target = open3d.PointCloud()
-    target.points = open3d.Vector3dVector(trgt)
+    target = open3d.geometry.PointCloud()
+    target.points = open3d.utility.Vector3dVector(trgt)
 
     init_rotation_4x4 = np.eye(4, 4)
     init_rotation_4x4[0:3, 0:3] = init_rotation
 
     threshold = 0.2
-    reg_p2p = open3d.registration_icp(source, target, threshold, init_rotation_4x4,
-                                    open3d.TransformationEstimationPointToPoint())
+    reg_p2p = open3d.registration.registration_icp(source, target, threshold, init_rotation_4x4,
+                                    open3d.registration.TransformationEstimationPointToPoint())
 
     return reg_p2p
 
@@ -103,7 +103,24 @@ def compute_alignment_candidates(cfg, dataset, all_rotations_file):
         obj = scipy.io.loadmat(gt_filename)
         gt = obj["points"]
 
-        data = scipy.io.loadmat(f"{save_dir}/{sample.name}_pc.mat")
+        # print(gt.shape, "!" * 20)
+        # print(a)
+
+        tran = [
+            [0., 0., 1.],
+            [0., 1., 0.],
+            [-1., 0., 0.]
+        ]
+        # tran = [
+        #     [-1., 0., 0.],
+        #     [0., 1., 0.],
+        #     [0., 0., -1.]
+        # ]
+        # new_point = pc_transform(points_np_gt['points'].reshape(1, -1, 3), tran)
+        gt = np.dot(gt, tran)
+
+        # data = scipy.io.loadmat(f"{save_dir}/{sample.name}_pc.mat")
+        data = scipy.io.loadmat(f"{save_dir}/{sample.name}_pc")
         all_pcs = np.squeeze(data["points"])
         all_cameras = data["camera_pose"]
 
