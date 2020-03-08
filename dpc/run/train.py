@@ -56,7 +56,7 @@ def train():
     dataset = tf.data.TFRecordDataset(dataset_file, compression_type=tf_record_compression(cfg))
     if cfg.shuffle_dataset:
         dataset = dataset.shuffle(7000)
-    dataset = dataset.map(lambda rec: parse_tf_records(cfg, rec), num_parallel_calls=4) \
+    dataset = dataset.map(lambda rec: parse_tf_records(cfg, rec), num_parallel_calls=3) \
         .batch(cfg.batch_size) \
         .prefetch(buffer_size=100) \
         .repeat()
@@ -76,7 +76,8 @@ def train():
         outputs = model_fn(inputs)
 
         # train_scopes
-        train_scopes = ['encoder', 'decoder']
+        # train_scopes = ['encoder', 'decoder']
+        train_scopes = ['encoder', 'trash']
 
         # loss
         task_loss = model.get_loss(inputs, outputs)
