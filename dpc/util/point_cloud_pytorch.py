@@ -143,12 +143,24 @@ def pointcloud2voxels3d_fast(cfg, pc, rgb):  # [B,N,3]
     return voxels, voxels_rgb
 
 
+
 def smoothen_voxels3d(cfg, voxels, kernel):
-    if cfg.pc_separable_gauss_filter:
-        for krnl in kernel:
-            voxels = tf.nn.conv3d(voxels, krnl, [1, 1, 1, 1, 1], padding="SAME")
-    else:
-        voxels = tf.nn.conv3d(voxels, kernel, [1, 1, 1, 1, 1], padding="SAME")
+    """
+    assume the input voxels shape is [batch, d, h, w, channel],\n
+    first convert it to [batch, channel. d, h, w], then re-convert it before return
+    """
+    # removed this step if the input voxels is already in [batch, channel, d, h, w]
+    voxels = voxels.permute((0,4,1,2,3))
+    
+    padding_size = int((cfg.pc_gauss_kernel_size-1)/2)
+    # convolute throught different dims
+    voxels = torch.nn.functional.conv3d(voxels, kernel[0], stride=(1,1,1), padding=(10,0,0))
+    voxels = torch.nn.functional.conv3d(voxels, kernel[1], stride=(1,1,1), padding=(0,10,0))
+    voxels = torch.nn.functional.conv3d(voxels, kernel[2], stride=(1,1,1), padding=(0,0,10))
+
+    # removed this step if the expected output is [batch, channel, d, h, w]
+    voxels = voxels.permute((0,2,3,4,1))
+
     return voxels
 
 
