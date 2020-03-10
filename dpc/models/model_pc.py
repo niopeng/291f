@@ -202,17 +202,17 @@ class ModelPointCloud(ModelBase):  # pylint:disable=invalid-name
             pc = decoder_out['xyz']
             outputs['points_1'] = pc
             outputs['rgb_1'] = decoder_out['rgb']
-            # outputs['scaling_factor'] = predict_scaling_factor(cfg, outputs[key], is_training)
-            # outputs['focal_length'] = predict_focal_length(cfg, outputs['ids'], is_training)
+            outputs['scaling_factor'] = predict_scaling_factor(cfg, outputs[key], is_training)
+            outputs['focal_length'] = predict_focal_length(cfg, outputs['ids'], is_training)
 
             if cfg.predict_pose:
                 posenet_fn = get_network(cfg.posenet_name)
                 pose_out = posenet_fn(enc_outputs['poses'], cfg)
                 outputs.update(pose_out)
         
-        with tf.variable_scope('trash', reuse=reuse):
-            outputs['scaling_factor'] = predict_scaling_factor(cfg, outputs[key], is_training)
-            outputs['focal_length'] = predict_focal_length(cfg, outputs['ids'], is_training)
+        # with tf.variable_scope('trash', reuse=reuse):
+        #     outputs['scaling_factor'] = predict_scaling_factor(cfg, outputs[key], is_training)
+        #     outputs['focal_length'] = predict_focal_length(cfg, outputs['ids'], is_training)
 
         if self._alignment_to_canonical is not None:
             outputs = align_predictions(outputs, self._alignment_to_canonical)

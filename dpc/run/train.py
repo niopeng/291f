@@ -15,7 +15,7 @@ from util.train import get_trainable_variables, get_learning_rate
 from util.losses import regularization_loss
 from util.fs import mkdir_if_missing
 from util.data import tf_record_compression
-
+import tensorflow.contrib.slim as slim
 tfsum = tf.contrib.summary
 
 
@@ -68,6 +68,7 @@ def train():
 
     with summary_writer.as_default(), tfsum.record_summaries_every_n_global_steps(10):
         global_step = tf.train.get_or_create_global_step()
+        print("global step: ", global_step)
         model = model_pc.ModelPointCloud(cfg, global_step)
         inputs = model.preprocess(train_data, cfg.step_size)
 
@@ -76,8 +77,9 @@ def train():
         outputs = model_fn(inputs)
 
         # train_scopes
+        train_scopes = ["encoder"]
         # train_scopes = ['encoder', 'decoder']
-        train_scopes = ['encoder', 'trash']
+        # train_scopes = ['encoder', 'trash']
 
         # loss
         task_loss = model.get_loss(inputs, outputs)
@@ -106,6 +108,13 @@ def train():
         tf.global_variables_initializer().run()
         tf.local_variables_initializer().run()
         tfsum.initialize(graph=tf.get_default_graph())
+        ## TODO load pretrain
+        variables_to_restore = slim.get_variables_to_restore(exclude=["meta"])
+        restorer = tf.train.Saver(variables_to_restore)
+        checkpoint_file = "model-665000"
+        #tf.train.latest_checkpoint(cfg.checkpoint_dir)
+        print("restoring checkpoint", checkpoint_file)
+        restorer.restore(sess, checkpoint_file)
 
         global_step_val = 0
         while global_step_val < cfg.max_number_of_steps:
@@ -113,7 +122,7 @@ def train():
             _, loss_val, global_step_val, summary = sess.run([train_op, loss, global_step, summary_op])
             t1 = time.perf_counter()
             dt = t1 - t0
-            print(f"step: {global_step_val}, loss = {loss_val:.4f} ({dt:.3f} sec/step)")
+            print(f"step: {global_step_val}, loss = {loss_val:.4f} ({dt:.3f} sec/step), lr = {sess.run(optimizer._lr)}")
             if global_step_val % 5000 == 0:
                 saver.save(sess, f"{train_dir}/model", global_step=global_step_val)
 
