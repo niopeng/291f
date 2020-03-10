@@ -7,7 +7,7 @@ python ../dpc/run/create_tf_records.py \
 --tfrecords_gzip_compressed=True \
 --synth_set=$1 \
 --image_size=128 \
---store_camera=True \
+--store_camera=False \
 --store_voxels=False \
---store_depth=True \
---num_views=5
+--store_depth=False \
+--num_views=7

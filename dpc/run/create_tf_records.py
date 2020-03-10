@@ -91,6 +91,7 @@ def create_record(synth_set, split_name, models):
     im_size = FLAGS.image_size
     num_views = FLAGS.num_views
     num_models = len(models)
+    count = 0
 
     mkdir_if_missing(FLAGS.out_dir)
 
@@ -122,6 +123,15 @@ def create_record(synth_set, split_name, models):
         cameras = np.zeros((num_views, 4, 4), dtype=np.float32)
         cam_pos = np.zeros((num_views, 3), dtype=np.float32)
         depths = np.zeros((num_views, im_size, im_size, 1), dtype=np.float32)
+
+        # print(im_dir, images, "{}/render_*.png".format(im_dir))
+        # print(glob.glob("{}/render_*.png".format(im_dir)))
+        # print(len(images), num_views)
+        #
+        if (len(images) >= num_views):
+            count += 1
+        else:
+            continue
 
         assert(len(images) >= num_views)
 
@@ -194,6 +204,8 @@ def create_record(synth_set, split_name, models):
     writer.close()
     sys.stdout.flush()
 
+    print("!"* 10, count)
+
 
 SPLIT_DEF = [("val", 0.05), ("train", 0.95)]
 
@@ -240,7 +252,12 @@ def load_drc_split(base_dir, synth_set):
 
 def generate_records(synth_set):
     base_dir = FLAGS.split_dir
-    split = load_drc_split(base_dir, synth_set)
+    # split = load_drc_split(base_dir, synth_set)
+
+    split = {}
+    # split['val'] = ["SS_%03d" % i for i in range(3, 14)]
+    split['val'] = ["SS_%03d" % i for i in range(14, 187)]
+    # split['val'] = ["SS_%03d" % 1]
 
     for key, value in split.items():
         create_record(synth_set, key, value)

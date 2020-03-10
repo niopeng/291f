@@ -54,7 +54,8 @@ def run_eval():
         print(sample.name)
         model_names.append(sample.name)
 
-        mat_filename = "{}/{}_pc.mat".format(save_dir, sample.name)
+        # mat_filename = "{}/{}_pc.mat".format(save_dir, sample.name)
+        mat_filename = "{}/{}_pc".format(save_dir, sample.name)
         data = scipy.io.loadmat(mat_filename)
         all_cameras = data["camera_pose"]
 
