@@ -12,7 +12,7 @@ pc_point_dropout: 0.07
 predict_pose: true
 pose_predict_num_candidates: 4
 pose_predictor_student_loss_weight: 20.0
-num_views: 4 
+num_views: 3
 step_size: 3
 focal_length: 1.875
 max_number_of_steps: 665000
