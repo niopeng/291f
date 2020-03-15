@@ -77,8 +77,9 @@ def train():
         outputs = model_fn(inputs)
 
         # train_scopes
-        train_scopes = ["encoder"]
-        # train_scopes = ['encoder', 'decoder']
+#         train_scopes = ["encoder"]
+#         train_scopes = ["decoder"]
+        train_scopes = ['encoder', 'decoder']
         # train_scopes = ['encoder', 'trash']
 
         # loss
@@ -111,7 +112,8 @@ def train():
         ## TODO load pretrain
         variables_to_restore = slim.get_variables_to_restore(exclude=["meta"])
         restorer = tf.train.Saver(variables_to_restore)
-        checkpoint_file = "model-665000"
+#         checkpoint_file = "model-665000"
+        checkpoint_file = "model-600000"
         #tf.train.latest_checkpoint(cfg.checkpoint_dir)
         print("restoring checkpoint", checkpoint_file)
         restorer.restore(sess, checkpoint_file)
