@@ -344,6 +344,8 @@ class ModelPointCloud(ModelBase):  # pylint:disable=invalid-name
         loss.backward()
         self.optimizer.step()
 
+        return loss
+
 
     # def model_predict(self, images, is_training=False, reuse=False, predict_for_all=False, alignment=None):
     #     outputs = {}
