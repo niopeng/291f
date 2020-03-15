@@ -5,14 +5,14 @@ from tqdm import tqdm
 import os
 import time
 
-import tensorflow as tf
+# import tensorflow as tf
 
-from models import model_pc
+from models import model_pc_pytorch
 
 from util.app_config import config as app_config
 from util.system import setup_environment
-from util.train import get_trainable_variables, get_learning_rate
-from util.losses import regularization_loss
+# from util.train import get_trainable_variables, get_learning_rate
+# from util.losses import regularization_loss
 from util.fs import mkdir_if_missing
 
 import torch
@@ -29,7 +29,7 @@ def train():
     train_dir = cfg.checkpoint_dir
     mkdir_if_missing(train_dir)
 
-    tf.logging.set_verbosity(tf.logging.INFO)
+    # tf.logging.set_verbosity(tf.logging.INFO)
 
     split_name = "val" #train
     dataset_file = os.path.join(cfg.inp_dir, f"{cfg.synth_set}_{split_name}.pkl")
@@ -45,22 +45,29 @@ def train():
     for epoch in tqdm(range(cfg.max_number_of_steps), desc='Epoch', ncols=100):
         train_size = len(train_loader)
         ts = time.time()
+        print_now = 0
         for batch_idx, train_data in tqdm(enumerate(train_loader), desc='Batch', total=train_size,
                                       ncols=100):
-            global_step = tf.train.get_or_create_global_step()
-            model = model_pc.ModelPointCloud(cfg, global_step)
+            # global_step = tf.train.get_or_create_global_step()
+            # model = model_pc_pytorch.ModelPointCloud(cfg, global_step)
+            model = model_pc_pytorch.ModelPointCloud(cfg)
             inputs = preprocess(cfg, train_data)
-            print('inputs shape')
-            for i in inputs:
-                print(i, inputs[i].shape)
+            # print('inputs shape')
+            # for i in inputs:
+            #     print(i, inputs[i].shape)
             # Call Forward of model
-            outputs = model(inputs)
-            task_loss = model.get_loss(inputs, outputs)
+            # outputs = model(inputs)
+            # task_loss = model.get_loss(inputs, outputs)
+            loss = model.optimize_parameters(inputs)
+            if print_now % 200 == 0:
+                print("Epoch: %d, Step: %d, Loss: %f" % (epoch, print_now, loss.item()))
+            print_now += 1
             #reg_loss = regularization_loss(train_scopes, cfg)
             #loss = task_loss + reg_loss
 
-            break
-        break
+            # break
+        # break
+    print("Training Complete!")
 
     '''
     dataset = dataset.map(lambda rec: parse_tf_records(cfg, rec), num_parallel_calls=4) \
