@@ -77,10 +77,8 @@ def train():
         outputs = model_fn(inputs)
 
         # train_scopes
-#         train_scopes = ["encoder"]
-#         train_scopes = ["decoder"]
-        train_scopes = ['encoder', 'decoder']
-        # train_scopes = ['encoder', 'trash']
+        train_scopes = ["decoder/point_cloud"]
+
 
         # loss
         task_loss = model.get_loss(inputs, outputs)
