@@ -78,6 +78,7 @@ def train():
 
         # train_scopes
         train_scopes = ["decoder/point_cloud"]
+#         train_scopes = ["decoder"]
 
 
         # loss
@@ -108,10 +109,12 @@ def train():
         tf.local_variables_initializer().run()
         tfsum.initialize(graph=tf.get_default_graph())
         ## TODO load pretrain
-        variables_to_restore = slim.get_variables_to_restore(exclude=["meta"])
+        variables_to_restore = slim.get_variables_to_restore(exclude=["meta"]) 
+        #, "decoder/point_cloud"
+        print(variables_to_restore)
         restorer = tf.train.Saver(variables_to_restore)
-#         checkpoint_file = "model-665000"
-        checkpoint_file = "model-600000"
+        checkpoint_file = "model-665000"
+#         checkpoint_file = "model-600000"
         #tf.train.latest_checkpoint(cfg.checkpoint_dir)
         print("restoring checkpoint", checkpoint_file)
         restorer.restore(sess, checkpoint_file)

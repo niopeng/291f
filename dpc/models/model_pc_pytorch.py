@@ -10,14 +10,17 @@ from models.model_base_pytorch import ModelBase, pool_single_view
 # from util.losses import add_drc_loss, add_proj_rgb_loss, add_proj_depth_loss
 from util.point_cloud_pytorch import pointcloud_project, pointcloud_project_fast, \
     pc_point_dropout
-from util.gauss_kernel_pytorch import gauss_smoothen_image, smoothing_kernel
+from util.gauss_kernel_pytorch import smoothing_kernel
 from util.quaternion_torch import \
     quaternion_multiply as q_mul,\
     quaternion_normalise as q_norm,\
     quaternion_rotate as q_rotate,\
     quaternion_conjugate as q_conj
 
-from nets.net_factory_pytorch import get_network
+from nets.net_factory_torch import get_network
+from nets.img_encoder_torch import imgEncoder
+from nets.pc_decoder_torch import pcDecoder
+from nets.pose_net_torch import poseDecoder
 
 
 # slim = tf.contrib.slim
@@ -104,7 +107,7 @@ class Scale_net(nn.Module):
         super(Scale_net, self).__init__()
 
         self.cfg = cfg
-        self.layer = nn.Linear(self.z_dim, 1)
+        self.layer = nn.Linear(cfg.z_dim, 1)
 
     def forward(self, inputs):
         out = F.sigmoid(self.layer(inputs)) * self.cfg.pc_occupancy_scaling_maximum
@@ -196,9 +199,9 @@ class ModelPointCloud(ModelBase):  # pylint:disable=invalid-name
             self.set_alignment_to_canonical()
 
         # added code piece
-        self.encoder = get_network(cfg.encoder_name).to(self.device)
-        self.decoder = get_network(cfg.decoder_name).to(self.device)
-        self.posenet = get_network(cfg.posenet_name).to(self.device)
+        self.encoder = imgEncoder(cfg, channel_number=3, image_size=128).to(self.device)
+        self.decoder = pcDecoder(cfg, afterConvSize=4096).to(self.device)
+        self.posenet = poseDecoder(cfg).to(self.device)
         self.scalenet = Scale_net(cfg).to(self.device)
 
         if is_train:
@@ -312,7 +315,7 @@ class ModelPointCloud(ModelBase):  # pylint:disable=invalid-name
         outputs = {}
         cfg = self._params
 
-        self.optimizer_G.zero_grad()
+        self.optimizer.zero_grad()
         enc_outputs = self.encoder(images)
         ids = enc_outputs['ids']
         outputs['conv_features'] = enc_outputs['conv_features']

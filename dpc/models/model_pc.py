@@ -102,7 +102,8 @@ def predict_scaling_factor(cfg, input, is_training):
         pred = tf.sigmoid(pred) * cfg.pc_occupancy_scaling_maximum
 
     if is_training:
-        tf.contrib.summary.scalar("pc_occupancy_scaling_factor", tf.reduce_mean(pred))
+#         tf.contrib.summary.scalar("pc_occupancy_scaling_factor", tf.reduce_mean(pred))
+        tf.contrib.summary.scalar("meta/pc_occupancy_scaling_factor", tf.reduce_mean(pred))
 
     return pred
 
@@ -202,7 +203,8 @@ class ModelPointCloud(ModelBase):  # pylint:disable=invalid-name
             pc = decoder_out['xyz']
             outputs['points_1'] = pc
             outputs['rgb_1'] = decoder_out['rgb']
-            outputs['scaling_factor'] = predict_scaling_factor(cfg, outputs[key], is_training)
+#             outputs['scaling_factor'] = predict_scaling_factor(cfg, outputs[key], is_training)
+            outputs['scaling_factor'] = None
             outputs['focal_length'] = predict_focal_length(cfg, outputs['ids'], is_training)
 
             if cfg.predict_pose:
