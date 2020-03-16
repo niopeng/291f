@@ -308,10 +308,10 @@ class ModelPointCloud(ModelBase):  # pylint:disable=invalid-name
         return outputs
 
 
-    def optimize_parameters(self, images, predict_for_all=False):
+    def optimize_parameters(self, inputs, predict_for_all=False):
         outputs = {}
         cfg = self._params
-
+        images = inputs['image']
         self.optimizer_G.zero_grad()
         enc_outputs = self.encoder(images)
         ids = enc_outputs['ids']
@@ -339,7 +339,7 @@ class ModelPointCloud(ModelBase):  # pylint:disable=invalid-name
         if self._alignment_to_canonical is not None:
             outputs = align_predictions(outputs, self._alignment_to_canonical)
 
-        loss = self.get_loss(images, outputs)
+        loss = self.get_loss(inputs, outputs)
 
         loss.backward()
         self.optimizer.step()
