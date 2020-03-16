@@ -55,7 +55,7 @@ def model_student(inputs, model):
     transl = outputs["predicted_translation"] if cfg.predict_translation else None
     proj_out = pointcloud_project_fast(model.cfg(), points, camera_pose, transl,
                                        rgb, model.gauss_kernel())
-    proj = proj_out["proj_depth"]
+    proj = proj_out['proj'] #proj_out["proj_depth"]
 
     return proj, camera_pose
 
