@@ -317,10 +317,6 @@ class ModelPointCloud(ModelBase):  # pylint:disable=invalid-name
         images = inputs['images'].to(self.device)
     
         self.optimizer.zero_grad()
-<<<<<<< HEAD
-=======
-
->>>>>>> 93eacf45d4d91d8e1337a80fb998eacfb3ed0718
         enc_outputs = self.encoder(images)
         ids = enc_outputs['ids']
         outputs['conv_features'] = enc_outputs['conv_features']
