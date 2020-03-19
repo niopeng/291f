@@ -29,6 +29,8 @@ class Chair_dataset(Dataset):
     def __getitem__(self, idx):
         sample = {'image': torch.FloatTensor(self.image[idx].reshape((self.num_views, self.image_size, self.image_size, 3))),
                   'mask': torch.FloatTensor(self.mask[idx].reshape((self.num_views, self.image_size, self.image_size, 1)))}
+        sample['image'] = sample['image'].permute((0, 3, 1, 2))
+        sample['mask'] = sample['mask'].permute((0, 3, 1, 2))
                   #'name': np.array(self.name[idx])}
         if len(self.vox)>0:
             sample['vox'] =torch.FloatTensor(self.vox[idx])

@@ -14,19 +14,24 @@ class basePoseEstimator(nn.Module):
         self.f_dim = 32
         self.input_size = cfg.z_dim
         self.act_func = nn.LeakyReLU(negative_slope=0.2)
-        self.layers = []
+        layers = []
         for k in range(self.num_layers):
             if k == 0:
-                self.layers.append(nn.Linear(self.input_size, self.f_dim))
+                layers.append(nn.Linear(self.input_size, self.f_dim))
+                layers.append(self.act_func)
             elif k == self.num_layers - 1:
-                self.layers.append(nn.Linear(self.f_dim, 4))
+                layers.append(nn.Linear(self.f_dim, 4))
+                layers.append(self.act_func)
             else:
-                self.layers.append(nn.Linear(self.f_dim, self.f_dim))
+                layers.append(nn.Linear(self.f_dim, self.f_dim))
+                layers.append(self.act_func)
+        self.layers = nn.Sequential(*layers)
     
     def forward(self, inputs):
         out = inputs
-        for layer in self.layers:
-            out = self.act_func(layer(out))
+        out = self.layers(out)
+#         for layer in self.layers:
+#             out = self.act_func(layer(out))
         return out
 
 
@@ -39,9 +44,10 @@ class poseDecoder(nn.Module):
 
         self.cfg = cfg
         self.num_candidates = cfg.pose_predict_num_candidates
-        self.estimators = []
+        estimators = []
         for _ in range(self.num_candidates):
-            self.estimators.append(basePoseEstimator(self.cfg))
+            estimators.append(basePoseEstimator(self.cfg))
+        self.estimators = nn.Sequential(*estimators)
         
         if self.cfg.pose_predictor_student:
             self.student_estimator = basePoseEstimator(self.cfg)

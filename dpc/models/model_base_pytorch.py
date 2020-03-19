@@ -7,8 +7,9 @@ import torch
 
 def pool_single_view(cfg, tensor, view_idx):
     indices = torch.arange(cfg.batch_size) * cfg.step_size + view_idx
-    indices = torch.unsqueeze(indices, dim=-1)
-    return tensor[torch.arange(tensor.size(0)), indices]
+#     indices = torch.unsqueeze(indices, dim=-1)
+#     return tensor[torch.arange(tensor.size(0)), indices]
+    return tensor[indices, :]
 
 
 class ModelBase(object):  # pylint:disable=invalid-name

@@ -162,7 +162,7 @@ class Scale_net(nn.Module):
 #     return pred
 
 
-def predict_focal_length(cfg, input, is_training):
+def predict_focal_length(cfg, input, is_training=None):
     return None
     # if not cfg.learn_focal_length:
     #     return None
@@ -314,7 +314,8 @@ class ModelPointCloud(ModelBase):  # pylint:disable=invalid-name
     def optimize_parameters(self, inputs, predict_for_all=False):
         outputs = {}
         cfg = self._params
-        images = inputs['image']
+        images = inputs['images'].to(self.device)
+    
         self.optimizer.zero_grad()
 <<<<<<< HEAD
 =======
@@ -327,9 +328,11 @@ class ModelPointCloud(ModelBase):  # pylint:disable=invalid-name
         outputs['z_latent'] = enc_outputs['z_latent']
 
         # unsupervised case, case where convnet runs on all views, need to extract the first
+#         print("#"*10, ids.size())
         if ids.size(0) != cfg.batch_size:
             ids = pool_single_view(cfg, ids, 0)
         outputs['ids_1'] = ids
+#         print("#$"*10, ids.size(),cfg.batch_size )
 
         key = 'ids' if predict_for_all else 'ids_1'
         decoder_out = self.decoder(outputs[key], outputs)
@@ -598,7 +601,8 @@ class ModelPointCloud(ModelBase):  # pylint:disable=invalid-name
 
     def add_proj_loss(self, inputs, outputs, weight_scale, add_summary):
         cfg = self.cfg()
-        gt = inputs['masks']
+        gt = inputs['masks'].to(self.device)
+        print(outputs.keys())
         pred = outputs['projs']
         num_samples = pred.size(0)
 
