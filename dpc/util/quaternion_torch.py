@@ -80,7 +80,8 @@ def quaternion_multiply(a, b):
 
 def quaternion_conjugate(q):
     """Compute the conjugate of q, i.e. [q.w, -q.x, -q.y, -q.z]."""
-    return torch.mul(q, [1.0, -1.0, -1.0, -1.0])
+    device = q.get_device()
+    return torch.mul(q, torch.tensor([1.0, -1.0, -1.0, -1.0]).to(device))
 
 
 def quaternion_normalise(q):

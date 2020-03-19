@@ -324,9 +324,9 @@ def pc_point_dropout(points, rgb, keep_prob):
     num_input_points = points.size(1)
     batch_size = points.size(0)
     num_channels = points.size(2)
-    num_output_points = (num_input_points * keep_prob).type_as(torch.int32)
+    num_output_points = int(num_input_points * keep_prob)
 
-    out_points = np.empty([batch_size, num_output_points, num_channels])
+    out_points = torch.empty([batch_size, num_output_points, num_channels])
     for i in range(batch_size):
         cur_ind = np.random.choice(num_input_points, num_output_points, replace=False)
         out_points[i] = points[i][cur_ind]

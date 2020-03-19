@@ -309,6 +309,44 @@ class ModelPointCloud(ModelBase):  # pylint:disable=invalid-name
             outputs = align_predictions(outputs, self._alignment_to_canonical)
 
         return outputs
+    
+    
+#     def forward_pass(inputs):
+#             code = 'images' if self.cfg.predict_pose else 'images_1'
+#             outputs = self.model_predict(inputs[code], is_training, reuse)
+#             pc = outputs['points_1']
+
+#             if run_projection:
+#                 all_points = self.replicate_for_multiview(pc)
+#                 num_candidates = cfg.pose_predict_num_candidates
+#                 all_focal_length = None
+#                 if num_candidates > 1:
+#                     all_points = tf_repeat_0(all_points, num_candidates)
+#                     if cfg.predict_translation:
+#                         trans = outputs["predicted_translation"]
+#                         outputs["predicted_translation"] = tf_repeat_0(trans, num_candidates)
+#                     focal_length = outputs['focal_length']
+#                     if focal_length is not None:
+#                         all_focal_length = tf_repeat_0(focal_length, num_candidates)
+
+#                 outputs['all_focal_length'] = all_focal_length
+#                 outputs['all_points'] = all_points
+#                 if cfg.pc_learn_occupancy_scaling:
+#                     all_scaling_factors = self.replicate_for_multiview(outputs['scaling_factor'])
+#                     if num_candidates > 1:
+#                         all_scaling_factors = tf_repeat_0(all_scaling_factors, num_candidates)
+#                 else:
+#                     all_scaling_factors = None
+#                 outputs['all_scaling_factors'] = all_scaling_factors
+#                 if cfg.pc_rgb:
+#                     all_rgb = self.replicate_for_multiview(outputs['rgb_1'])
+#                 else:
+#                     all_rgb = None
+#                 outputs['all_rgb'] = all_rgb
+
+#                 outputs = self.compute_projection(inputs, outputs, is_training)
+
+#             return outputs
 
 
     def optimize_parameters(self, inputs, predict_for_all=False):
@@ -345,6 +383,37 @@ class ModelPointCloud(ModelBase):  # pylint:disable=invalid-name
 
         if self._alignment_to_canonical is not None:
             outputs = align_predictions(outputs, self._alignment_to_canonical)
+            
+        pc = outputs['points_1']
+#             if run_projection:
+        all_points = self.replicate_for_multiview(pc)
+        num_candidates = cfg.pose_predict_num_candidates
+        all_focal_length = None
+        if num_candidates > 1:
+            all_points = tf_repeat_0(all_points, num_candidates)
+            if cfg.predict_translation:
+                trans = outputs["predicted_translation"]
+                outputs["predicted_translation"] = tf_repeat_0(trans, num_candidates)
+            focal_length = outputs['focal_length']
+            if focal_length is not None:
+                all_focal_length = tf_repeat_0(focal_length, num_candidates)
+
+        outputs['all_focal_length'] = all_focal_length
+        outputs['all_points'] = all_points
+        if cfg.pc_learn_occupancy_scaling:
+            all_scaling_factors = self.replicate_for_multiview(outputs['scaling_factor'])
+            if num_candidates > 1:
+                all_scaling_factors = tf_repeat_0(all_scaling_factors, num_candidates)
+        else:
+            all_scaling_factors = None
+        outputs['all_scaling_factors'] = all_scaling_factors
+        if cfg.pc_rgb:
+            all_rgb = self.replicate_for_multiview(outputs['rgb_1'])
+        else:
+            all_rgb = None
+        outputs['all_rgb'] = all_rgb
+
+        outputs = self.compute_projection(inputs, outputs)
 
         loss = self.get_loss(inputs, outputs)
 
@@ -424,7 +493,7 @@ class ModelPointCloud(ModelBase):  # pylint:disable=invalid-name
         cfg = self.cfg()
         return get_dropout_prob(cfg, self._global_step)
 
-    def compute_projection(self, inputs, outputs, is_training):
+    def compute_projection(self, inputs, outputs, is_training=True):
         cfg = self.cfg()
         all_points = outputs['all_points']
         all_rgb = outputs['all_rgb']
