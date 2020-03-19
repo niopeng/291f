@@ -18,25 +18,31 @@ class imgEncoder(nn.Module):
         self.channel_number = channel_number
         self.image_size = image_size
         self.act_func = nn.LeakyReLU(negative_slope=0.2)
-        self.conv_list = []
-        self.conv_list.append(nn.Conv2d(self.channel_number, self.f_dim, (5,5), stride=(2,2),padding=2))
+        conv_list = []
+        conv_list.append(nn.Conv2d(self.channel_number, self.f_dim, (5,5), stride=(2,2),padding=2))
+        conv_list.append(self.act_func)
         target_spatial_size = 4
         num_blocks = int(np.log2(self.image_size / target_spatial_size) - 1)
         f_dim= self.f_dim
         for _ in range(num_blocks):
             new_f_dim = f_dim * 2
-            self.conv_list.append(nn.Conv2d(f_dim, new_f_dim, (3,3), stride=(2,2), padding=1))
-            self.conv_list.append(nn.Conv2d(new_f_dim, new_f_dim, (3,3), stride=(1,1), padding=1))
+            conv_list.append(nn.Conv2d(f_dim, new_f_dim, (3,3), stride=(2,2), padding=1))
+            conv_list.append(self.act_func)
+            conv_list.append(nn.Conv2d(new_f_dim, new_f_dim, (3,3), stride=(1,1), padding=1))
+            conv_list.append(self.act_func)
             f_dim = new_f_dim
     
         self.fc1 = nn.Linear(256*4*4, self.fc_dim)
         self.fc2 = nn.Linear(self.fc_dim, self.fc_dim)
         self.fc3 = nn.Linear(self.fc_dim, self.z_dim)
         self.pose_fc = nn.Linear(self.fc_dim, self.z_dim)
+        
+        self.conv_list = nn.Sequential(*conv_list)
     
         # aka msra initialization
         for layer in self.conv_list:
-            nn.init.kaiming_normal_(layer.weight, a=0.2)
+            if not isinstance(layer, nn.LeakyReLU):
+                nn.init.kaiming_normal_(layer.weight, a=0.2)
         nn.init.kaiming_normal_(self.fc1.weight, a=0.2)
         nn.init.kaiming_normal_(self.fc2.weight, a=0.2)
         nn.init.kaiming_normal_(self.fc3.weight, a=0.2)
@@ -54,17 +60,22 @@ class imgEncoder(nn.Module):
 
         images = self._preprocess(images)
         out = images
-        for conv_layer in self.conv_list:
-            out = self.act_func(conv_layer(out))
+#         for conv_layer in self.conv_list:
+#             out = self.act_func(conv_layer(out))
+        out = self.conv_list(out)
         out = out.view(batch_size, -1)
+#         print("1#" *10, out.size())
         outputs["conv_features"] = out
 
         out = self.act_func(self.fc1(out))
+#         print("2#" *10, out.size())
         outputs["z_latent"] = out
         out = self.act_func(self.fc2(out))
+#         print("3#" *10, out.size())
         if self.cfg.predict_pose:
             outputs["poses"] = self.pose_fc(out)
         out = self.act_func(self.fc3(out))
+#         print("4#" *10, out.size())
         outputs["ids"] = out
 
         return outputs
