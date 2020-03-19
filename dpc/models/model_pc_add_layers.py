@@ -102,8 +102,7 @@ def predict_scaling_factor(cfg, input, is_training):
         pred = tf.sigmoid(pred) * cfg.pc_occupancy_scaling_maximum
 
     if is_training:
-#         tf.contrib.summary.scalar("pc_occupancy_scaling_factor", tf.reduce_mean(pred))
-        tf.contrib.summary.scalar("meta/pc_occupancy_scaling_factor", tf.reduce_mean(pred))
+        tf.contrib.summary.scalar("pc_occupancy_scaling_factor", tf.reduce_mean(pred))
 
     return pred
 
@@ -180,12 +179,10 @@ class ModelPointCloud(ModelBase):  # pylint:disable=invalid-name
 
         # First, build the encoder
         encoder_fn = get_network(cfg.encoder_name)
-        # second_encoder_fn = get_network("extra_layer")
         with tf.variable_scope('encoder', reuse=reuse):
             # Produces id/pose units
             enc_outputs = encoder_fn(images, cfg, is_training)
             ids = enc_outputs['ids']
-            # ids = second_encoder_fn(enc_outputs['ids'], cfg)
             outputs['conv_features'] = enc_outputs['conv_features']
             outputs['ids'] = ids
             outputs['z_latent'] = enc_outputs['z_latent']
@@ -203,18 +200,13 @@ class ModelPointCloud(ModelBase):  # pylint:disable=invalid-name
             pc = decoder_out['xyz']
             outputs['points_1'] = pc
             outputs['rgb_1'] = decoder_out['rgb']
-#             outputs['scaling_factor'] = predict_scaling_factor(cfg, outputs[key], is_training)
-            outputs['scaling_factor'] = None
+            outputs['scaling_factor'] = predict_scaling_factor(cfg, outputs[key], is_training)
             outputs['focal_length'] = predict_focal_length(cfg, outputs['ids'], is_training)
 
             if cfg.predict_pose:
                 posenet_fn = get_network(cfg.posenet_name)
                 pose_out = posenet_fn(enc_outputs['poses'], cfg)
                 outputs.update(pose_out)
-        
-        # with tf.variable_scope('trash', reuse=reuse):
-        #     outputs['scaling_factor'] = predict_scaling_factor(cfg, outputs[key], is_training)
-        #     outputs['focal_length'] = predict_focal_length(cfg, outputs['ids'], is_training)
 
         if self._alignment_to_canonical is not None:
             outputs = align_predictions(outputs, self._alignment_to_canonical)

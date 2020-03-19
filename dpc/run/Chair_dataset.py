@@ -2,8 +2,7 @@ import torch
 from torch.utils.data import Dataset
 import pickle
 import numpy as np
-import tensorflow as tf
-from util.camera import camera_from_blender, quaternion_from_campos
+from util.camera_torch import camera_from_blender, quaternion_from_campos
 
 class Chair_dataset(Dataset):
 
@@ -86,7 +85,7 @@ def preprocess(cfg, raw_inputs, random_views=True):
 
         return torch.LongTensor(out), torch.LongTensor(valid_samples)
 
-    num_actual_views = raw_inputs['num_views'] if var_num_views else tf.constant([0])
+    num_actual_views = raw_inputs['num_views'] if var_num_views else torch.tensor([0])
 
     indices, valid_samples = batch_sampler(num_actual_views) #[tf.int64, tf.float32])
     indices = torch.reshape(indices, [step_size * quantity, 2])
