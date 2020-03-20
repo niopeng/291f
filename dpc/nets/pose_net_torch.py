@@ -67,7 +67,8 @@ class poseDecoder(nn.Module):
         output = {}
         pose_candidates = [estimator(inputs) for estimator in self.estimators]
         pose_teachers = torch.cat(pose_candidates, dim=1)
-        pose_teachers = pose_teachers.view(-1, self.num_candidates, 4)
+#         pose_teachers = pose_teachers.view(-1, self.num_candidates, 4)
+        pose_teachers = pose_teachers.view(-1, 4)
         
         if self.student_estimator is None:
             pose_student = None
@@ -80,7 +81,7 @@ class poseDecoder(nn.Module):
             t = self.pose_translate_layer(inputs)
             if self.cfg.predict_translation_tanh:
                 t = nn.Tanh()(t) * self.cfg.predict_translation_scaling_factor
-        
+#         pose_teachers = pose_teachers.view([-1, 4])
         output["poses"] = pose_teachers
         output["pose_student"] = pose_student
         output["predicted_translation"] = t

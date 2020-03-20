@@ -122,6 +122,7 @@ def preprocess(cfg, raw_inputs, random_views=True):
         cam_pos =  gather_nd(raw_inputs['cam_pos'], indices[:,1],step_size)
         orig_shape = cam_pos.shape
         quaternion = quaternion_from_campos_wrapper(cam_pos)
+#         print("="*10, cam_pos.size(), quaternion.size())
         inputs['camera_quaternion'] = torch.reshape(quaternion, shape=[orig_shape[0], 4])
     return inputs
 

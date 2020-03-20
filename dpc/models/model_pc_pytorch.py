@@ -110,7 +110,7 @@ class Scale_net(nn.Module):
         self.layer = nn.Linear(cfg.z_dim, 1)
 
     def forward(self, inputs):
-        out = F.sigmoid(self.layer(inputs)) * self.cfg.pc_occupancy_scaling_maximum
+        out = torch.sigmoid(self.layer(inputs)) * self.cfg.pc_occupancy_scaling_maximum
         return out
 
 
@@ -244,7 +244,10 @@ class ModelPointCloud(ModelBase):  # pylint:disable=invalid-name
         # tf.contrib.summary.scalar("meta/gauss_sigma_rel", sigma_rel)
         self._sigma_rel = sigma_rel
         self._gauss_sigma = sigma_rel / cfg.vox_size
-        self._gauss_kernel = smoothing_kernel(cfg, sigma_rel)
+        kernels = smoothing_kernel(cfg, sigma_rel)
+        self._gauss_kernel = []
+        for k in kernels:
+            self._gauss_kernel.append(k.to(self.device))
 
     def gauss_sigma(self):
         return self._gauss_sigma
@@ -380,6 +383,7 @@ class ModelPointCloud(ModelBase):  # pylint:disable=invalid-name
         if cfg.predict_pose:
             pose_out = self.posenet(enc_outputs['poses'])
             outputs.update(pose_out)
+#             print("pose"*5, pose_out['poses'].size())
 
         if self._alignment_to_canonical is not None:
             outputs = align_predictions(outputs, self._alignment_to_canonical)
@@ -389,6 +393,7 @@ class ModelPointCloud(ModelBase):  # pylint:disable=invalid-name
         all_points = self.replicate_for_multiview(pc)
         num_candidates = cfg.pose_predict_num_candidates
         all_focal_length = None
+#         print("("*10, outputs["predicted_translation"])
         if num_candidates > 1:
             all_points = tf_repeat_0(all_points, num_candidates)
             if cfg.predict_translation:
@@ -513,6 +518,7 @@ class ModelPointCloud(ModelBase):  # pylint:disable=invalid-name
             all_points, all_rgb = pc_point_dropout(all_points, all_rgb, dropout_prob)
 
         if cfg.pc_fast:
+#             print("["*10, camera_pose.size())
             predicted_translation = outputs["predicted_translation"] if cfg.predict_translation else None
             proj_out = pointcloud_project_fast(cfg, all_points, camera_pose, predicted_translation,
                                                all_rgb, self.gauss_kernel(),
@@ -598,12 +604,17 @@ class ModelPointCloud(ModelBase):  # pylint:disable=invalid-name
 
         min_loss_mask = torch.FloatTensor(all_loss.size(0), num_candidates)
         min_loss_mask.zero_()
-        min_loss_mask.scatter_(1, min_loss, 1)
+        
+#         min_loss_mask.scatter_(1, min_loss, 1)
+#         print(min_loss.size(), torch.tensor(torch.split(min_loss, 1, dim=0)).flatten().size())
+#         print(":"*10)
+        min_loss_mask[min_loss] = 1
+#     min_loss_mask[torch.tensor(torch.split(min_loss, 1, dim=0)).flatten()] = 1
         # min_loss_mask = tf.one_hot(min_loss, num_candidates) # [BATCH*VIEWS, CANDIDATES]
         num_samples = min_loss_mask.size(0)
 
         min_loss_mask_flat = torch.reshape(min_loss_mask, [-1]) # [BATCH*VIEWS*CANDIDATES]
-        min_loss_mask_final = torch.reshape(min_loss_mask_flat, [-1, 1, 1, 1]) # [BATCH*VIEWS*CANDIDATES, 1, 1, 1]
+        min_loss_mask_final = torch.reshape(min_loss_mask_flat, [-1, 1, 1, 1]).to(gt.get_device()) # [BATCH*VIEWS*CANDIDATES, 1, 1, 1]
         loss_tensor = (gt - pred) * min_loss_mask_final
         if cfg.variable_num_views:
             weights = inputs["valid_samples"]
@@ -632,10 +643,10 @@ class ModelPointCloud(ModelBase):  # pylint:disable=invalid-name
         # batch_indices = torch.unsqueeze(batch_indices, -1)
         # indices = torch.concat([batch_indices, indices], dim=1)
         # teachers = tf.gather_nd(teachers, indices)
-        teachers = teachers[torch.arange(teachers.size(0)), min_loss]
+        teachers = teachers[torch.arange(teachers.size(0)), min_loss].detach()
         # use teachers only as ground truth
         # teachers = tf.stop_gradient(teachers)
-        teachers.requires_grad_(False)
+#         teachers.requires_grad_(False)
 
         if cfg.variable_num_views:
             weights = inputs["valid_samples"]
@@ -668,11 +679,14 @@ class ModelPointCloud(ModelBase):  # pylint:disable=invalid-name
     def add_proj_loss(self, inputs, outputs, weight_scale, add_summary):
         cfg = self.cfg()
         gt = inputs['masks'].to(self.device)
-        print(outputs.keys())
+#         print(outputs.keys())
         pred = outputs['projs']
         num_samples = pred.size(0)
 
-        gt_size = gt.size(1)
+#         print("[]"*10)
+#         print(gt.size(), pred.size())
+        
+        gt_size = gt.size(-1)
         pred_size = pred.size(1)
         assert gt_size >= pred_size, "GT size should not be higher than prediction size"
         if gt_size > pred_size:
@@ -694,7 +708,7 @@ class ModelPointCloud(ModelBase):  # pylint:disable=invalid-name
         num_candidates = cfg.pose_predict_num_candidates
         if num_candidates > 1:
             # pass
-            proj_loss, min_loss = self.proj_loss_pose_candidates(gt, pred, inputs)
+            proj_loss, min_loss = self.proj_loss_pose_candidates(gt.permute(0, 2, 3, 1), pred, inputs)
             if cfg.pose_predictor_student:
                 student_loss = self.add_student_loss(inputs, outputs, min_loss, add_summary)
                 total_loss += student_loss
@@ -716,7 +730,8 @@ class ModelPointCloud(ModelBase):  # pylint:disable=invalid-name
 
 
     def regularization_loss(self, cfg):
-        reg_loss = torch.zeros(1, dtype=torch.float32)
+#         reg_loss = torch.zeros(1, dtype=torch.float32)
+        reg_loss = torch.tensor(0, dtype=torch.float32, requires_grad=True).to(self.device)
         if cfg.weight_decay > 0:
             for v in self.params:
                 reg_loss += torch.sum(v ** 2) / 2
@@ -727,9 +742,12 @@ class ModelPointCloud(ModelBase):  # pylint:disable=invalid-name
     def get_loss(self, inputs, outputs, add_summary=True):
         """Computes the loss used for PTN paper (projection + volume loss)."""
         cfg = self.cfg()
+        torch.autograd.set_detect_anomaly(True)
         # g_loss = tf.zeros(dtype=tf.float32, shape=[])
         g_loss = self.add_proj_loss(inputs, outputs, cfg.proj_weight, add_summary)
-        g_loss += self.regularization_loss(cfg)
+        r_loss = self.regularization_loss(cfg)
+#         print(g_loss, r_loss)
+        g_loss += r_loss
         # if cfg.proj_weight:
         #     g_loss += self.add_proj_loss(inputs, outputs, cfg.proj_weight, add_summary)
 

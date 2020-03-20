@@ -75,17 +75,25 @@ def pointcloud2voxels3d_fast(cfg, pc, rgb):  # [B,N,3]
     half_size = grid_size / 2
 
     filter_outliers = True
-    valid = pc >= -half_size and pc <= half_size
+    valid = (pc >= -half_size) & (pc <= half_size)
+    valid = valid[:, :, 0] & valid[:, :, 1] & valid[:, :, 2]
+#     valid = torch.where((pc >= -half_size) and (pc <= half_size))
+#     print("pp"*10, valid.type())
+#     print("v!"*10, valid)
     # valid = tf.reduce_all(valid, axis=-1)
 
-    vox_size_tf = torch.tensor([[[vox_size_z, vox_size, vox_size]]], dtype=torch.float32)
+    vox_size_tf = torch.tensor([[[vox_size_z, vox_size, vox_size]]], dtype=torch.float32).to(pc.get_device())
     pc_grid = (pc + half_size) * (vox_size_tf - 1)
+#     print("grid"*10, pc_grid.size(), vox_size_tf.size())
     indices_floor = torch.floor(pc_grid)
-    indices_int = indices_floor.type_as(torch.int32)
-    batch_indices = torch.range(0, batch_size, 1)
+    indices_int = indices_floor.type(torch.int32)
+    batch_indices = torch.arange(0, batch_size, 1)
     batch_indices = torch.unsqueeze(batch_indices, -1)
-    batch_indices = torch.repeat_interleave(batch_indices, torch.tensor([1, num_points]))
-    batch_indices = torch.unsqueeze(batch_indices, -1)
+#     batch_indices = torch.repeat_interleave(batch_indices, torch.tensor([1, num_points]))
+    batch_indices = torch.repeat_interleave(batch_indices, num_points, dim=-1)
+    batch_indices = torch.unsqueeze(batch_indices, -1).type(torch.int32).to(pc.get_device())
+    
+#     print(batch_indices.size(), "[]"*10)
 
     indices = torch.cat([batch_indices, indices_int], axis=2)
     indices = torch.reshape(indices, [-1, 4])
@@ -94,9 +102,15 @@ def pointcloud2voxels3d_fast(cfg, pc, rgb):  # [B,N,3]
     rr = [1.0 - r, r]
 
     if filter_outliers:
+        
         valid = torch.reshape(valid, [-1])
+#         print("|v"*10, valid)
         # indices = tf.boolean_mask(indices, valid)
-        indices = indices[valid.nonzero()]
+#         indices = indices[valid.nonzero(), :]
+        indices = indices[valid].clone()
+#         print(";;;v"*10, indices)
+#         print("''''v"*10, valid.nonzero())
+        
 
     def interpolate_scatter3d(pos):
         updates_raw = rr[pos[0]][:, :, 0] * rr[pos[1]][:, :, 1] * rr[pos[2]][:, :, 2]
@@ -104,16 +118,38 @@ def pointcloud2voxels3d_fast(cfg, pc, rgb):  # [B,N,3]
         if filter_outliers:
             # updates = tf.boolean_mask(updates, valid)
             # updates = updates[valid.nonzero(), :]
-            updates = updates[valid.nonzero()]
+#             print("v"*10, valid)
+            updates = updates[valid].clone()
 
-        indices_loc = indices
+        indices_loc = indices.clone()
         indices_shift = torch.tensor([[0] + pos])
         num_updates = indices_loc.size(0)
-        indices_shift = torch.repeat_interleave(indices_shift, torch.tensor([num_updates, 1]))
+#         indices_shift = torch.repeat_interleave(indices_shift, torch.tensor([num_updates, 1]))
+        indices_shift = torch.repeat_interleave(indices_shift, num_updates, dim=0).to(indices.get_device())
         indices_loc = indices_loc + indices_shift
 
         voxels = torch.zeros([batch_size, vox_size_z, vox_size, vox_size], dtype=torch.float32, requires_grad=True)
-        voxels.scatter_(0, indices_loc, updates)
+#         print(voxels.size())
+#         print("aaaaaaaa!!!!!!!!", indices_loc.size())
+#         print(indices_loc[:5, :])
+#         print("aaaaaaaa!!!!!!!!"*2, updates.size())
+#         print(updates[:5])
+#         print("aaaaaaaa!!!!!!!!"*3, indices.size())
+#         print(indices[:5, :])
+
+        result = voxels.clone().to(indices.get_device())
+        
+#         print("bbbb!!!!!!!!"*2)
+#         for i, index in enumerate(indices_loc):
+#             result += updates[i]
+#         voxels = result
+        
+        result[torch.split(indices_loc, 1, dim=1)] = updates.view(-1, 1)
+        voxels = result.clone()
+        
+#         print("aaaaaaaa!!!!!!!!"*2)
+        
+#         voxels = voxels.clone().to(indices.get_device()).scatter(0, indices_loc, updates)
         # voxels = tf.scatter_nd(indices_loc, updates, [batch_size, vox_size_z, vox_size, vox_size])
         # if has_rgb:
         #     if cfg.pc_rgb_stop_points_gradient:
@@ -150,13 +186,14 @@ def smoothen_voxels3d(cfg, voxels, kernel):
     first convert it to [batch, channel. d, h, w], then re-convert it before return
     """
     # removed this step if the input voxels is already in [batch, channel, d, h, w]
+#     print("v"*10, voxels.size())
     voxels = voxels.permute((0,4,1,2,3))
     
     padding_size = int((cfg.pc_gauss_kernel_size-1)/2)
     # convolute throught different dims
-    voxels = torch.nn.functional.conv3d(voxels, kernel[0], stride=(1,1,1), padding=(10,0,0))
-    voxels = torch.nn.functional.conv3d(voxels, kernel[1], stride=(1,1,1), padding=(0,10,0))
-    voxels = torch.nn.functional.conv3d(voxels, kernel[2], stride=(1,1,1), padding=(0,0,10))
+    voxels = torch.nn.functional.conv3d(voxels, kernel[0], stride=(1,1,1), padding=(padding_size,0,0))
+    voxels = torch.nn.functional.conv3d(voxels, kernel[1], stride=(1,1,1), padding=(0,padding_size,0))
+    voxels = torch.nn.functional.conv3d(voxels, kernel[2], stride=(1,1,1), padding=(0,0,padding_size))
 
     # removed this step if the expected output is [batch, channel, d, h, w]
     voxels = voxels.permute((0,2,3,4,1))
@@ -247,7 +284,7 @@ def pc_perspective_transform(cfg, point_cloud,
 def pointcloud_project(cfg, point_cloud, transform, sigma):
     tr_pc = pc_perspective_transform(cfg, point_cloud, transform)
     voxels = pointcloud2voxels(cfg, tr_pc, sigma)
-    voxels = torch.transpose(voxels, [0, 2, 1, 3, 4])
+    voxels = torch.permute(voxels, [0, 2, 1, 3, 4])
 
     proj, probs = util.drc_pytorch.drc_projection(voxels, cfg)
     proj = torch.flip(proj, [1])
@@ -295,14 +332,14 @@ def pointcloud_project_fast(cfg, point_cloud, transform, predicted_translation,
         proj_depth = None
     else:
         proj, drc_probs = util.drc_pytorch.drc_projection(voxels, cfg)
-        drc_probs = torch.flip(drc_probs, 2)
+        drc_probs = torch.flip(drc_probs, [2])
         proj_depth = util.drc_pytorch.drc_depth_projection(drc_probs, cfg)
 
     # proj = tf.reverse(proj, [1])
-    proj = torch.flip(proj, 1)
+    proj = torch.flip(proj, [1])
 
     if voxels_rgb is not None:
-        voxels_rgb = torch.flip(voxels_rgb, 2)
+        voxels_rgb = torch.flip(voxels_rgb, [2])
         proj_rgb = util.drc_pytorch.project_volume_rgb_integral(cfg, drc_probs, voxels_rgb)
     else:
         proj_rgb = None
@@ -321,12 +358,14 @@ def pointcloud_project_fast(cfg, point_cloud, transform, predicted_translation,
 
 def pc_point_dropout(points, rgb, keep_prob):
     # shape = points.shape.as_list()
+#     print(";"*10, points.size())
     num_input_points = points.size(1)
     batch_size = points.size(0)
     num_channels = points.size(2)
     num_output_points = int(num_input_points * keep_prob)
 
-    out_points = torch.empty([batch_size, num_output_points, num_channels])
+    out_points = torch.zeros([batch_size, num_output_points, num_channels], requires_grad=True)
+#     print("l"*10, out_points.size())
     for i in range(batch_size):
         cur_ind = np.random.choice(num_input_points, num_output_points, replace=False)
         out_points[i] = points[i][cur_ind]

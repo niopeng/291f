@@ -148,7 +148,8 @@ def compute_predictions():
         sess.run(tf.global_variables_initializer())
         sess.run(tf.local_variables_initializer())
 
-        variables_to_restore = slim.get_variables_to_restore(exclude=["meta", "decoder/point_cloud"])
+#         variables_to_restore = slim.get_variables_to_restore(exclude=["meta", "decoder/point_cloud"])
+        variables_to_restore = slim.get_variables_to_restore(exclude=["meta"])
 
     restorer = tf.train.Saver(variables_to_restore)
     checkpoint_file = tf.train.latest_checkpoint(exp_dir)

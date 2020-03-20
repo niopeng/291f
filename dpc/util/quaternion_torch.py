@@ -39,10 +39,11 @@ def vector3d_to_quaternion(x):
     Raises:
         ValueError, if the last dimension of x is not 3.
     """
-    x = torch.tensor(x)
+#     x = torch.tensor(x)
     if x.size()[-1] != 3:
         raise ValueError("The last dimension of x must be 3.")
-    return torch.nn.functional.pad(x, (x.dim() - 1) * [[0, 0]] + [[1, 0]])
+#     return torch.nn.functional.pad(x, (x.dim() - 1) * [[0, 0]] + [[1, 0]])
+    return torch.nn.functional.pad(x, (1,0))
 
 
 def _prepare_tensor_for_div_mul(x):
@@ -52,7 +53,7 @@ def _prepare_tensor_for_div_mul(x):
     b) prepends a 0 in the last dimension if the last dimension is 3,
     c) validates the type and shape.
     """
-    x = torch.tensor(x)
+#     x = torch.tensor(x)
     if x.size()[-1] == 3:
         x = vector3d_to_quaternion(x)
     validate_shape(x)
@@ -67,10 +68,13 @@ def quaternion_multiply(a, b):
     Returns:
         A `Quaternion`.
     """
+#     print("a, b" + "!" * 10, a.size(), b.size()) 
     a = _prepare_tensor_for_div_mul(a)
-    b = _prepare_tensor_for_div_mul(b)
+    b = _prepare_tensor_for_div_mul(b).to(a.get_device())
     w1, x1, y1, z1 = torch.unbind(a, dim=-1)
     w2, x2, y2, z2 = torch.unbind(b, dim=-1)
+#     print("ab"*10, a.get_device(), b.get_device())
+#     print("%" * 10, w1.size(), w2.size(), x1.size(), x2.size(), y1.size(), y2.size(), z1.size(), z2.size())
     w = w1 * w2 - x1 * x2 - y1 * y2 - z1 * z2
     x = w1 * x2 + x1 * w2 + y1 * z2 - z1 * y2
     y = w1 * y2 + y1 * w2 + z1 * x2 - x1 * z2
@@ -91,7 +95,7 @@ def quaternion_normalise(q):
     Returns:
         q / ||q||_2
     """
-    return q / torch.norm(q, dim=-1, keepdims=True)
+    return q / torch.norm(q, dim=-1, keepdim=True)
 
 
 def quaternion_rotate(pc, q, inverse=False):
@@ -103,16 +107,20 @@ def quaternion_rotate(pc, q, inverse=False):
     Returns:
         q * pc * q'
     """
+#     print("+++++++++qqqqqqqqqqqqq", q.size())
     q_norm = torch.unsqueeze(torch.norm(q, dim=-1), dim=-1)
     q /= q_norm
     q = torch.unsqueeze(q, dim=1)  # [B,1,4]
     q_ = quaternion_conjugate(q)
     qmul = quaternion_multiply
+#     print("qqqqqqqqqqqqq", q.size())
+#     print("pc"* 10, pc.size())
+#     print("q_"*10, q_.size())
     if not inverse:
         wxyz = qmul(qmul(q, pc), q_)  # [B,N,4]
     else:
         wxyz = qmul(qmul(q_, pc), q)  # [B,N,4]
-    if len(wxyz.dim) == 2: # bug with batch size of 1
+    if wxyz.dim() == 2: # bug with batch size of 1
         wxyz = torch.unsqueeze(wxyz, dim=0)
     xyz = wxyz[:, :, 1:4]  # [B,N,3]
     return xyz

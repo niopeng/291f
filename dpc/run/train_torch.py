@@ -56,7 +56,7 @@ def train():
             # Call Forward of model
             # outputs = model(inputs)
             # task_loss = model.get_loss(inputs, outputs)
-            print(inputs.keys())
+#             print(inputs.keys())
             loss = model.optimize_parameters(inputs)
             if print_now % 200 == 0:
                 print("Epoch: %d, Step: %d, Loss: %f" % (epoch, print_now, loss.item()))
